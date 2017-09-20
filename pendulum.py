@@ -85,6 +85,7 @@ def create_data(n_points=30):
         if "t" not in f:
             f.create_dataset("t", data=t)
         theta_range = np.linspace(-np.pi, np.pi, n_points)
+        saved_datasets = 0
         for theta1 in theta_range:
             for theta2 in theta_range:
                 r = np.array([theta1, theta2, 0, 0])
@@ -93,8 +94,10 @@ def create_data(n_points=30):
                     data = odeint(derivative, r, t)
                     f.create_dataset(name, data=data)
                     print(f"Saved {name}")
+                    saved_datasets += 1
                 else:
                     print(f"{name} was already in {f.filename}")
+    return saved_datasets
 
 
 def does_flip(t, full_r):
@@ -112,12 +115,40 @@ def does_flip(t, full_r):
 def load_data():
     with h5py.File("pendulum_data.hdf5") as f:
         t = f['t']
+        theta1 = []
+        theta2 = []
+        flips = []
         for name in f:
             if name is not "t":
-                theta1, theta2 = [float(x) for x in name.split(",")]
-                print(theta1, theta2, does_flip(t, f[name][...]))
+                this_theta1, this_theta2 = [float(x) for x in name.split(",")]
+                this_flips = does_flip(t, f[name][...])
+                theta1.append(this_theta1)
+                theta2.append(this_theta2)
+                flips.append(this_flips)
+    theta1 = np.array(theta1)
+    theta2 = np.array(theta2)
+    flips = np.array(flips)
+
+    theta1_range = np.linspace(theta1.min(), theta1.max(), 100)
+    theta2_range = np.linspace(theta2.min(), theta2.max(), 100)
+    THETA1, THETA2 = np.meshgrid(theta1_range, theta2_range)
+    flips_at = can_flip(THETA1, THETA2)
+    plt.contourf(THETA1, THETA2, flips_at, 50)
+    plt.colorbar()
+    plt.contour(THETA1, THETA2, flips_at >= 0, 1)
+    plt.title("Energy surplus")
+    plt.scatter(theta1, theta2, c=flips)
+    plt.show()
+
+
+def continuous_create():
+    n_points = 30
+    while True:
+        print(f"Running for {n_points} points within the range")
+        create_data(n_points)
+        n_points *= 2
 
 
 if __name__ == "__main__":
     load_data()
-    create_data()
+    continuous_create()
