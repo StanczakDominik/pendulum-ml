@@ -46,7 +46,7 @@ def energy(r):
     theta1, theta2, p1, p2 = r
     Dtheta1 = dtheta1(r)
     Dtheta2 = dtheta2(r)
-    kinetic = m * l**2 / 6 * (Dtheta2**2 + 4 * Dtheta1**2 + 3 * Dtheta1 * Dtheta2  * np.cos(theta1 - theta2))
+    kinetic = m * l**2 / 6 * (Dtheta2**2 + 4 * Dtheta1**2 + 3 * Dtheta1 * Dtheta2 * np.cos(theta1 - theta2))
     potential = -0.5 * m * g * l * (3 * np.cos(theta1) + np.cos(theta2))
     return kinetic + potential
 
@@ -64,12 +64,13 @@ def visualize(t, full_r):
     ax2.set_title("Energy")
     plt.show()
 
+
 def can_flip(theta1, theta2):
     """flips when this is positive"""
     return - 3 * np.cos(theta1) - np.cos(theta2) + 2
 
 
-def visualize_energy_surplus(theta_range = np.linspace(-np.pi, np.pi, 300)):
+def visualize_energy_surplus(theta_range=np.linspace(-np.pi, np.pi, 300)):
     THETA1, THETA2 = np.meshgrid(theta_range, theta_range)
     flips_at = can_flip(THETA1, THETA2)
     plt.contourf(THETA1, THETA2, flips_at, 50)
@@ -79,7 +80,7 @@ def visualize_energy_surplus(theta_range = np.linspace(-np.pi, np.pi, 300)):
     plt.show()
 
 
-def create_data(n_points = 30):
+def create_data(n_points=30):
     with h5py.File("pendulum_data.hdf5") as f:
         if "t" not in f:
             f.create_dataset("t", data=t)
@@ -96,12 +97,25 @@ def create_data(n_points = 30):
                     print(f"{name} was already in {f.filename}")
 
 
+def does_flip(t, full_r):
+    theta1, theta2, p1, p2 = full_r.T
+    theta1 = (theta1 + np.pi) // (2 * np.pi)
+    return np.any(theta1 != 0)
+    # fig, (ax1, ax2) = plt.subplots(2, sharex=True)
+    # ax1.plot(t, theta1, label="theta1")
+    # ax1.legend()
+    # ax2.plot(t, energy(full_r.T))
+    # ax2.set_title("Energy")
+    # plt.show()
+
+
 def load_data():
     with h5py.File("pendulum_data.hdf5") as f:
+        t = f['t']
         for name in f:
             if name is not "t":
                 theta1, theta2 = [float(x) for x in name.split(",")]
-                print(theta1, theta2)
+                print(theta1, theta2, does_flip(t, f[name][...]))
 
 
 if __name__ == "__main__":
