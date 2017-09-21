@@ -94,6 +94,7 @@ def create_data(n_points=30):
                     data = odeint(derivative, r, t)
                     f.create_dataset(name, data=data)
                     print(f"Saved {name}")
+                    f.flush()
                     saved_datasets += 1
                 else:
                     print(f"{name} was already in {f.filename}")
@@ -142,7 +143,7 @@ def load_data():
 
 
 def continuous_create():
-    n_points = 30
+    n_points = 60
     while True:
         print(f"Running for {n_points} points within the range")
         create_data(n_points)
