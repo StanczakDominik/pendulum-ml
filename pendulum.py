@@ -113,6 +113,15 @@ def does_flip(t, full_r):
     # plt.show()
 
 
+def when_does_flip(t, full_r):
+    theta1, theta2, p1, p2 = full_r.T
+    theta1 = (theta1 + np.pi) // (2 * np.pi)
+    nonzero_flip = np.argmax(theta1 != 0)
+    if nonzero_flip == 0:
+        nonzero_flip = len(t)
+    return nonzero_flip
+
+
 def load_data():
     with h5py.File("pendulum_data.hdf5") as f:
         t = f['t']
@@ -122,7 +131,7 @@ def load_data():
         for name in f:
             if name is not "t":
                 this_theta1, this_theta2 = [float(x) for x in name.split(",")]
-                this_flips = does_flip(t, f[name][...])
+                this_flips = when_does_flip(t, f[name][...])
                 theta1.append(this_theta1)
                 theta2.append(this_theta2)
                 flips.append(this_flips)
@@ -139,6 +148,7 @@ def load_data():
     plt.contour(THETA1, THETA2, flips_at >= 0, 1)
     plt.title("Energy surplus")
     plt.scatter(theta1, theta2, c=flips)
+    plt.colorbar()
     plt.show()
 
 
