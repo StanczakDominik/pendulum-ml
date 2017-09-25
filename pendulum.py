@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 from scipy.integrate import odeint
+import dask
+import dask.multiprocessing
+import time
 
 m = 1
 l = 1
@@ -80,25 +83,21 @@ def visualize_energy_surplus(theta_range=np.linspace(-np.pi, np.pi, 300)):
     plt.show()
 
 
+def run_simulation(r, t):
+    full_r = odeint(derivative, r, t)
+    return when_does_flip(t, full_r)
+
+
 def create_data(n_points=30):
-    with h5py.File("pendulum_data.hdf5") as f:
+    with h5py.File("pendulum_data_small.hdf5") as f:
         if "t" not in f:
             f.create_dataset("t", data=t)
         theta_range = np.linspace(-np.pi, np.pi, n_points)
-        saved_datasets = 0
-        for theta1 in theta_range:
-            for theta2 in theta_range:
-                r = np.array([theta1, theta2, 0, 0])
-                name = f"{r[0]},{r[1]}"
-                if name not in f:
-                    data = odeint(derivative, r, t)
-                    f.create_dataset(name, data=data)
-                    print(f"Saved {name}")
-                    f.flush()
-                    saved_datasets += 1
-                else:
-                    print(f"{name} was already in {f.filename}")
-    return saved_datasets
+        theta = np.array([(theta1, theta2, 0, 0) for theta1 in theta_range for theta2 in theta_range])
+        f.create_dataset("theta", data=theta)
+        values = [dask.delayed(run_simulation)(r, t) for r in theta]
+        results = dask.compute(*values, get=dask.multiprocessing.get)
+        f.create_dataset("iters_at_flip", data=results)
 
 
 def does_flip(t, full_r):
@@ -123,21 +122,11 @@ def when_does_flip(t, full_r):
 
 
 def load_data():
-    with h5py.File("pendulum_data.hdf5") as f:
-        t = f['t']
-        theta1 = []
-        theta2 = []
-        flips = []
-        for name in f:
-            if name is not "t":
-                this_theta1, this_theta2 = [float(x) for x in name.split(",")]
-                this_flips = when_does_flip(t, f[name][...])
-                theta1.append(this_theta1)
-                theta2.append(this_theta2)
-                flips.append(this_flips)
-    theta1 = np.array(theta1)
-    theta2 = np.array(theta2)
-    flips = np.array(flips)
+    with h5py.File("pendulum_data_small.hdf5") as f:
+        theta = f['theta'][...]
+        theta1 = theta[:, 0]
+        theta2 = theta[:, 1]
+        flips = f['iters_at_flip'][...]
 
     theta1_range = np.linspace(theta1.min(), theta1.max(), 100)
     theta2_range = np.linspace(theta2.min(), theta2.max(), 100)
@@ -153,13 +142,19 @@ def load_data():
 
 
 def continuous_create():
-    n_points = 60
+    n_points = 10
     while True:
         print(f"Running for {n_points} points within the range")
+        start_time = time.time()
         create_data(n_points)
+        run_time = time.time() - start_time
+        print(f"Total run time in this pass: {run_time}")
         n_points *= 2
 
 
 if __name__ == "__main__":
-    load_data()
+    try:
+        load_data()
+    except KeyError:
+        print("File doesn't exist yet!")
     continuous_create()
