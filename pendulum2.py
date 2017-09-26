@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 from pendulum import t, dt, m, l, g
+from timeit import default_timer as timer
 # import pycuda.gpuarray as gpuarray
 
 timescale = np.sqrt(l / g)
@@ -60,7 +61,11 @@ def main(N_POINTS = 200):
         f.create_dataset("theta2", data=theta2)
         f.create_dataset("t", data=t)
 
+    
+    start = timer()
     compute_loop(r, flipped_point_iters)
+    timedelta = timer() - start
+    print(f"Operation took {timedelta} s")
 
     flipped_point_iters = flipped_point_iters.astype(float)
     flipped_point_iters[still_going(flipped_point_iters)] = np.nan
