@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 from scipy.integrate import odeint
+from joblib import Parallel, delayed
 
 m = 1
 l = 1
@@ -101,16 +102,36 @@ def create_data(n_points=30):
     return saved_datasets
 
 
+def compute_time_to_flip(r, t):
+    data = odeint(derivative, r, t)
+    return data, does_flip(t, data)
+
+
+def compute_row(theta_range, theta1, t, f):
+    for theta2 in theta_range:
+        r = np.array([theta1, theta2, 0, 0])
+        name = f"{r[0]},{r[1]}"
+        if name not in f:
+            data, fliptime = compute_time_to_flip(r, t)
+            f.create_dataset(name, data=data)
+            print(f"Saved {name}")
+            f.flush()
+        else:
+            print(f"{name} was already in {f.filename}")
+
+
+def create_data_parallel(n_points=30, filename="pendulum_data_parallel.hdf5"):
+    with h5py.File(filename) as f:
+        if "t" not in f:
+            f.create_dataset("t", data=t)
+        theta_range = np.linspace(-np.pi, np.pi, n_points)
+        Parallel(n_jobs=4)(delayed(compute_row)([(theta_range, theta1, t, f) for theta1 in theta_range]))
+
+
 def does_flip(t, full_r):
     theta1, theta2, p1, p2 = full_r.T
     theta1 = (theta1 + np.pi) // (2 * np.pi)
     return np.any(theta1 != 0)
-    # fig, (ax1, ax2) = plt.subplots(2, sharex=True)
-    # ax1.plot(t, theta1, label="theta1")
-    # ax1.legend()
-    # ax2.plot(t, energy(full_r.T))
-    # ax2.set_title("Energy")
-    # plt.show()
 
 
 def when_does_flip(t, full_r):
@@ -122,8 +143,26 @@ def when_does_flip(t, full_r):
     return nonzero_flip
 
 
-def load_data():
-    with h5py.File("pendulum_data.hdf5") as f:
+def visualize_full_result(theta1, theta2, flips):
+    theta1_range = np.linspace(theta1.min(), theta1.max(), 100)
+    theta2_range = np.linspace(theta2.min(), theta2.max(), 100)
+    THETA1, THETA2 = np.meshgrid(theta1_range, theta2_range)
+    flips_at = can_flip(THETA1, THETA2)
+    plt.contour(THETA1, THETA2, flips_at, 50)
+    plt.colorbar()
+    # plt.contour(THETA1, THETA2, flips_at >= 0, 1)
+    plt.title("Double pendulum time to flip versus surplus energy"
+              "from initial condition")
+    plt.scatter(theta1, theta2, c=flips, cmap='plasma')
+    plt.xlabel(r"$\theta_1$ (first pendulum) [rad]")
+    plt.ylabel(r"$\theta_2$ (second pendulum) [rad]")
+    plt.colorbar()
+    plt.tight_layout()
+    plt.show()
+
+
+def load_data(filename="pendulum_data.hdf5"):
+    with h5py.File(filename) as f:
         t = f['t']
         theta1 = []
         theta2 = []
@@ -138,18 +177,7 @@ def load_data():
     theta1 = np.array(theta1)
     theta2 = np.array(theta2)
     flips = np.array(flips)
-
-    theta1_range = np.linspace(theta1.min(), theta1.max(), 100)
-    theta2_range = np.linspace(theta2.min(), theta2.max(), 100)
-    THETA1, THETA2 = np.meshgrid(theta1_range, theta2_range)
-    flips_at = can_flip(THETA1, THETA2)
-    plt.contourf(THETA1, THETA2, flips_at, 50)
-    plt.colorbar()
-    plt.contour(THETA1, THETA2, flips_at >= 0, 1)
-    plt.title("Energy surplus")
-    plt.scatter(theta1, theta2, c=flips)
-    plt.colorbar()
-    plt.show()
+    visualize_full_result(theta1, theta2, flips)
 
 
 def continuous_create():
@@ -161,5 +189,7 @@ def continuous_create():
 
 
 if __name__ == "__main__":
-    load_data()
-    continuous_create()
+    # load_data("pendulum_data_parallel.hdf5")
+    create_data_parallel(6)
+    # load_data()
+    # continuous_create()
