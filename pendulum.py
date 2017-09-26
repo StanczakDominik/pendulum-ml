@@ -7,11 +7,9 @@ m = 1
 l = 1
 g = 1
 
-r = np.array((np.pi/1, np.pi/3, 0, 0))
-r = np.zeros(4)
-
 timescale = np.sqrt(l / g)
-t = np.arange(0, 1000 * timescale, 0.1/timescale)
+dt = 0.1 / timescale
+t = np.arange(0, 1000 * timescale, dt)
 
 
 def dtheta1(r):
@@ -51,10 +49,7 @@ def energy(r):
     return kinetic + potential
 
 
-full_r = odeint(derivative, r, t)
-
-
-def visualize(t, full_r):
+def visualize(full_r):
     theta1, theta2, p1, p2 = full_r.T
     fig, (ax1, ax2) = plt.subplots(2, sharex=True)
     ax1.plot(t, theta1, label="theta1")
@@ -101,7 +96,7 @@ def create_data(n_points=30):
     return saved_datasets
 
 
-def does_flip(t, full_r):
+def does_flip(full_r):
     theta1, theta2, p1, p2 = full_r.T
     theta1 = (theta1 + np.pi) // (2 * np.pi)
     return np.any(theta1 != 0)
@@ -113,7 +108,7 @@ def does_flip(t, full_r):
     # plt.show()
 
 
-def when_does_flip(t, full_r):
+def when_does_flip(full_r):
     theta1, theta2, p1, p2 = full_r.T
     theta1 = (theta1 + np.pi) // (2 * np.pi)
     nonzero_flip = np.argmax(theta1 != 0)
@@ -131,7 +126,7 @@ def load_data():
         for name in f:
             if name is not "t":
                 this_theta1, this_theta2 = [float(x) for x in name.split(",")]
-                this_flips = when_does_flip(t, f[name][...])
+                this_flips = when_does_flip(f[name][...])
                 theta1.append(this_theta1)
                 theta2.append(this_theta2)
                 flips.append(this_flips)
